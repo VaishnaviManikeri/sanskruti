@@ -36,9 +36,18 @@ app.get("/", (req, res) => {
   });
 });
 
+/* ===================== PING ROUTE ===================== */
+app.get("/ping", (req, res) => {
+  res.status(200).json({
+    message: "pong 🏓",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 /* ===================== DATABASE ===================== */
 mongoose
-  .connect(process.env.MONGO_URI) // ✅ NO OPTIONS
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err.message);
@@ -55,6 +64,15 @@ app.use("/api/blogs", require("./routes/blogs"));
 /* ===================== 404 HANDLER ===================== */
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
+});
+
+/* ===================== GLOBAL ERROR HANDLER ===================== */
+app.use((err, req, res, next) => {
+  console.error("❌ Error:", err.message);
+  res.status(500).json({
+    message: "Internal Server Error",
+    error: err.message,
+  });
 });
 
 /* ===================== SERVER ===================== */
