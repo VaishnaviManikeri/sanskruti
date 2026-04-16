@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
+const axios = require("axios"); // 🔥 added for Hostinger API check
 
 dotenv.config();
 
@@ -45,6 +46,26 @@ app.get("/ping", (req, res) => {
   });
 });
 
+/* ===================== HOSTINGER BACKEND STATUS ===================== */
+// 🔥 Replace URL with your Hostinger deployed backend URL
+app.get("/hostinger-status", async (req, res) => {
+  try {
+    const response = await axios.get(
+      process.env.HOSTINGER_BACKEND_URL || "https://your-hostinger-backend.com"
+    );
+
+    res.status(200).json({
+      status: "Hostinger backend reachable ✅",
+      data: response.data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "Hostinger backend unreachable ❌",
+      error: error.message,
+    });
+  }
+});
+
 /* ===================== DATABASE ===================== */
 mongoose
   .connect(process.env.MONGO_URI)
@@ -76,7 +97,7 @@ app.use((err, req, res, next) => {
 });
 
 /* ===================== SERVER ===================== */
-const PORT = process.env.PORT || 5000;
+const PORT = 5010; // ✅ updated port
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
