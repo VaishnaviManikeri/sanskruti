@@ -46,13 +46,14 @@ const upload = multer({
   fileFilter: fileFilter,
 });
 
+// IMPORTANT: Use .single('featuredImage') - this matches the field name from frontend
 // Public routes
 router.get("/", getAllBlogs);
 router.get("/:slug", getBlogBySlug);
 
-// Admin routes (add authentication middleware as needed)
-router.post("/", upload.single("featuredImage"), createBlog);
-router.put("/:id", upload.single("featuredImage"), updateBlog);
+// Admin routes
+router.post("/", upload.single('featuredImage'), createBlog);
+router.put("/:id", upload.single('featuredImage'), updateBlog);
 router.delete("/:id", deleteBlog);
 
 module.exports = router;
