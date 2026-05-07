@@ -27,8 +27,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* ===================== STATIC FILES ===================== */
+// app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// backend/server.js - Make sure this line exists
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
 /* ===================== HEALTH CHECK ===================== */
 app.get("/", (req, res) => {
   res.status(200).json({
