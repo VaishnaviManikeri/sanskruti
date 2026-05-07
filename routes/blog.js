@@ -18,6 +18,7 @@ const {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, '../uploads');
+    // Create uploads directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
@@ -25,7 +26,8 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'blog-' + uniqueSuffix + path.extname(file.originalname));
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, 'blog-' + uniqueSuffix + ext);
   },
 });
 
@@ -37,7 +39,7 @@ const fileFilter = (req, file, cb) => {
   if (mimetype && extname) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed'), false);
+    cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'), false);
   }
 };
 
@@ -47,15 +49,18 @@ const upload = multer({
   fileFilter: fileFilter,
 });
 
-// Public routes
+// ============= PUBLIC ROUTES =============
 router.get('/', getBlogs);
 router.get('/:id', getBlogById);
 router.get('/slug/:slug', getBlogBySlug);
 
-// Protected routes (require authentication)
+// ============= PROTECTED ROUTES (require authentication) =============
+// IMPORTANT: /upload-image route must come BEFORE /:id route to avoid conflict
+router.post('/upload-image', authMiddleware, upload.single('image'), uploadImage);
+
+// CRUD operations
 router.post('/', authMiddleware, createBlog);
 router.put('/:id', authMiddleware, updateBlog);
 router.delete('/:id', authMiddleware, deleteBlog);
-router.post('/upload-image', authMiddleware, upload.single('image'), uploadImage);
 
 module.exports = router;
