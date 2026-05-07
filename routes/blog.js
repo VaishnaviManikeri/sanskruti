@@ -21,13 +21,16 @@ const storage = multer.diskStorage({
     // Create uploads directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
+      console.log('Created uploads directory:', uploadDir);
     }
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, 'blog-' + uniqueSuffix + ext);
+    const filename = 'blog-' + uniqueSuffix + ext;
+    console.log('Saving file as:', filename);
+    cb(null, filename);
   },
 });
 
@@ -35,6 +38,13 @@ const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
+  
+  console.log('File filter check:', {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    extname: extname,
+    mimetype: mimetype
+  });
   
   if (mimetype && extname) {
     cb(null, true);
@@ -62,5 +72,19 @@ router.post('/upload-image', authMiddleware, upload.single('image'), uploadImage
 router.post('/', authMiddleware, createBlog);
 router.put('/:id', authMiddleware, updateBlog);
 router.delete('/:id', authMiddleware, deleteBlog);
+
+// Debug route to check if blog routes are working
+router.get('/debug/test', (req, res) => {
+  res.json({ message: 'Blog routes are working!' });
+});
+
+console.log('Blog routes registered');
+console.log('  - GET /api/blogs');
+console.log('  - GET /api/blogs/:id');
+console.log('  - GET /api/blogs/slug/:slug');
+console.log('  - POST /api/blogs/upload-image (protected)');
+console.log('  - POST /api/blogs (protected)');
+console.log('  - PUT /api/blogs/:id (protected)');
+console.log('  - DELETE /api/blogs/:id (protected)');
 
 module.exports = router;
