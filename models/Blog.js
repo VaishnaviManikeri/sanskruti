@@ -4,7 +4,7 @@ const blogSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, "Title is required"],
+      required: true,
       trim: true,
     },
     slug: {
@@ -14,34 +14,30 @@ const blogSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    content: {
-      type: String,
-      required: [true, "Content is required"],
-    },
     author: {
       type: String,
-      required: [true, "Author name is required"],
+      required: true,
       default: "Admin",
     },
-    featuredImage: {
+    content: {
       type: String,
-      required: [true, "Featured image is required"],
+      required: true,
     },
     metaTitle: {
       type: String,
-      required: [true, "Meta title is required"],
+      required: true,
     },
     metaDescription: {
       type: String,
-      required: [true, "Meta description is required"],
+      required: true,
+    },
+    featuredImage: {
+      type: String,
+      required: true,
     },
     readingTime: {
       type: Number,
-      default: 5,
-    },
-    views: {
-      type: Number,
-      default: 0,
+      default: 1,
     },
     published: {
       type: Boolean,
@@ -51,23 +47,24 @@ const blogSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    views: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Create slug from title before saving
+// Generate slug from title before saving
 blogSchema.pre("save", function (next) {
   if (this.isModified("title")) {
-    // Create base slug
-    let baseSlug = this.title
+    this.slug = this.title
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/[^a-zA-Z0-9]/g, "-")
+      .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
-    
-    // Add timestamp to ensure uniqueness
-    this.slug = `${baseSlug}-${Date.now()}`;
   }
   next();
 });
