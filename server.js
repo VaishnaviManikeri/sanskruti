@@ -119,7 +119,7 @@ app.use("/api/careers", require("./routes/careers"));
 /* =========================================================
    BLOG ROUTES
 ========================================================= */
-app.use("/api/blogs", require("./routes/blogRoutes"));
+app.use("/api/blogs", require("./routes/blog"));
 
 /* =========================================================
    404 ROUTE HANDLER
