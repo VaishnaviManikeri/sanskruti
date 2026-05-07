@@ -13,80 +13,70 @@ const blogSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   },
-  metaTitle: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  metaDescription: {
-    type: String,
-    required: true,
-    trim: true
-  },
   author: {
-    name: {
-      type: String,
-      required: true
-    },
-    avatar: {
-      type: String,
-      default: ''
-    },
-    bio: String
-  },
-  featuredImage: {
-    url: String,
-    alt: String,
-    caption: String
+    type: String,
+    required: true,
+    default: 'Sanskruti Team'
   },
   content: {
-    type: mongoose.Schema.Types.Mixed,
+    type: String,
     required: true
   },
+  excerpt: {
+    type: String,
+    required: true,
+    maxLength: 200
+  },
+  featuredImage: {
+    type: String,
+    required: true
+  },
+  images: [{
+    url: String,
+    caption: String,
+    alt: String
+  }],
   readingTime: {
     type: Number,
     default: 5
   },
-  tags: [String],
-  publishedAt: {
-    type: Date,
-    default: Date.now
+  metaTitle: {
+    type: String,
+    required: true
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  metaDescription: {
+    type: String,
+    required: true
   },
-  isPublished: {
+  tags: [{
+    type: String,
+    trim: true
+  }],
+  views: {
+    type: Number,
+    default: 0
+  },
+  published: {
     type: Boolean,
     default: true
   },
-  viewCount: {
-    type: Number,
-    default: 0
+  publishedAt: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true
 });
 
-// Pre-save middleware to generate slug from title if not provided
+// Generate slug from title before saving
 blogSchema.pre('save', function(next) {
-  if (!this.slug && this.title) {
+  if (this.isModified('title')) {
     this.slug = this.title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
   }
-  this.updatedAt = Date.now();
   next();
 });
-
-// Method to calculate reading time
-blogSchema.methods.calculateReadingTime = function() {
-  const wordsPerMinute = 200;
-  const text = JSON.stringify(this.content);
-  const words = text.trim().split(/\s+/).length;
-  this.readingTime = Math.ceil(words / wordsPerMinute);
-  return this.readingTime;
-};
 
 module.exports = mongoose.model('Blog', blogSchema);
