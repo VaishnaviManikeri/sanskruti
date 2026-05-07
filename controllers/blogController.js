@@ -107,8 +107,8 @@ const createBlog = async (req, res) => {
       content,
       excerpt,
       featuredImage,
-      metaTitle,
-      metaDescription,
+      metaTitle: metaTitle || title,
+      metaDescription: metaDescription || excerpt,
       tags: tags || [],
       readingTime: finalReadingTime || 5,
     });
@@ -220,24 +220,38 @@ const deleteBlog = async (req, res) => {
 // @access  Private
 const uploadImage = async (req, res) => {
   try {
+    console.log('Upload image request received');
+    console.log('Request file:', req.file);
+    
     if (!req.file) {
+      console.log('No file in request');
       return res.status(400).json({
         success: false,
-        message: 'No image file provided',
+        message: 'No image file provided. Please select an image file.',
       });
     }
     
+    // Get the uploaded file URL
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
     const imageUrl = `/uploads/${req.file.filename}`;
+    
+    console.log('Image uploaded successfully:', imageUrl);
     
     res.status(200).json({
       success: true,
+      message: 'Image uploaded successfully',
       url: imageUrl,
+      data: {
+        url: imageUrl,
+        filename: req.file.filename,
+        size: req.file.size,
+      },
     });
   } catch (error) {
     console.error('Error uploading image:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to upload image',
+      message: 'Failed to upload image: ' + error.message,
     });
   }
 };
