@@ -17,7 +17,7 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Configure multer for image upload
+// Configure multer for image upload with increased limits
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
@@ -42,18 +42,56 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { 
+    fileSize: 10 * 1024 * 1024, // Increase to 10MB limit
+    fieldSize: 50 * 1024 * 1024 // Increase field size limit
+  },
   fileFilter: fileFilter,
 });
 
-// IMPORTANT: Use .single('featuredImage') - this matches the field name from frontend
 // Public routes
 router.get("/", getAllBlogs);
 router.get("/:slug", getBlogBySlug);
 
-// Admin routes
-router.post("/", upload.single('featuredImage'), createBlog);
-router.put("/:id", upload.single('featuredImage'), updateBlog);
+// Admin routes - Add error handling middleware
+router.post("/", (req, res, next) => {
+  upload.single('featuredImage')(req, res, (err) => {
+    if (err) {
+      console.error("Multer error:", err);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ 
+          success: false,
+          message: "File too large. Maximum size is 10MB" 
+        });
+      }
+      return res.status(400).json({ 
+        success: false,
+        message: err.message 
+      });
+    }
+    next();
+  });
+}, createBlog);
+
+router.put("/:id", (req, res, next) => {
+  upload.single('featuredImage')(req, res, (err) => {
+    if (err) {
+      console.error("Multer error:", err);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ 
+          success: false,
+          message: "File too large. Maximum size is 10MB" 
+        });
+      }
+      return res.status(400).json({ 
+        success: false,
+        message: err.message 
+      });
+    }
+    next();
+  });
+}, updateBlog);
+
 router.delete("/:id", deleteBlog);
 
 module.exports = router;
