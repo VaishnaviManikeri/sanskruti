@@ -208,7 +208,7 @@ const uploadImage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
     
-    const imageUrl = `/uploads/${req.file.filename}`;
+    const imageUrl = `/uploads/blogs/${req.file.filename}`;
     res.status(200).json({ success: true, url: imageUrl });
   } catch (error) {
     console.error(error);
