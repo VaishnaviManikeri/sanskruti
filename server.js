@@ -3,44 +3,44 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
-const fs = require("fs");
+const axios = require("axios");
 
 dotenv.config();
 
 const app = express();
 
-/* ===================== CORS ===================== */
-const corsOptions = {
-  origin: [
-    "http://localhost:5173",
-    "https://sanskrutitechnoschool.com",
-    "https://www.sanskrutitechnoschool.com",
-    "https://api.sanskrutitechnoschool.com",
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-};
+/* =========================================================
+   CORS CONFIGURATION
+========================================================= */
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://sanskrutitechnoschool.com",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
-app.use(cors(corsOptions));
+/* =========================================================
+   BODY PARSER
+========================================================= */
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-/* ===================== BODY PARSER ===================== */
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+/* =========================================================
+   STATIC FILES
+========================================================= */
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"))
+);
 
-/* ===================== STATIC FILES ===================== */
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log("✅ Created uploads directory at:", uploadsDir);
-}
-
-// Serve static files from uploads directory
-app.use("/uploads", express.static(uploadsDir));
-console.log("📁 Serving static files from:", uploadsDir);
-
-/* ===================== HEALTH CHECK ===================== */
+/* =========================================================
+   HEALTH CHECK ROUTE
+========================================================= */
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "OK",
@@ -48,6 +48,9 @@ app.get("/", (req, res) => {
   });
 });
 
+/* =========================================================
+   PING ROUTE
+========================================================= */
 app.get("/ping", (req, res) => {
   res.status(200).json({
     message: "pong 🏓",
@@ -56,69 +59,96 @@ app.get("/ping", (req, res) => {
   });
 });
 
-/* ===================== DATABASE ===================== */
+/* =========================================================
+   HOSTINGER BACKEND STATUS CHECK
+========================================================= */
+app.get("/hostinger-status", async (req, res) => {
+  try {
+    const response = await axios.get(
+      process.env.HOSTINGER_BACKEND_URL ||
+        "https://your-hostinger-backend.com"
+    );
+
+    res.status(200).json({
+      status: "Hostinger backend reachable ✅",
+      data: response.data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "Hostinger backend unreachable ❌",
+      error: error.message,
+    });
+  }
+});
+
+/* =========================================================
+   DATABASE CONNECTION
+========================================================= */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("✅ MongoDB connected");
   })
   .catch((err) => {
-    console.error("❌ MongoDB connection error:", err.message);
+    console.error(
+      "❌ MongoDB connection error:",
+      err.message
+    );
     process.exit(1);
   });
 
-/* ===================== ROUTES ===================== */
+/* =========================================================
+   API ROUTES
+========================================================= */
+
+// AUTH ROUTES
 app.use("/api/auth", require("./routes/auth"));
+
+// GALLERY ROUTES
 app.use("/api/gallery", require("./routes/gallery"));
-app.use("/api/announcements", require("./routes/announcements"));
+
+// ANNOUNCEMENT ROUTES
+app.use(
+  "/api/announcements",
+  require("./routes/announcements")
+);
+
+// CAREER ROUTES
 app.use("/api/careers", require("./routes/careers"));
 
-// BLOG ROUTE - Make sure this line exists
-console.log("Registering blog routes at /api/blogs");
-app.use("/api/blogs", require("./routes/blog"));
+/* =========================================================
+   BLOG ROUTES
+========================================================= */
+app.use("/api/blogs", require("./routes/blogRoutes"));
 
-/* ===================== DEBUG ROUTES ===================== */
-app.get("/api/debug/routes", (req, res) => {
-  const routes = [];
-  const extractRoutes = (stack, basePath = '') => {
-    stack.forEach(layer => {
-      if (layer.route) {
-        const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
-        routes.push(`${methods} ${basePath}${layer.route.path}`);
-      } else if (layer.name === 'router' && layer.handle.stack) {
-        const routerPath = basePath + (layer.regexp.source.replace('\\/?(?=\\/|$)', '').replace(/\\\//g, '/').replace(/\^/g, '').replace(/\?/g, '').replace(/\(\[\^\\\/\]\+\?\)/g, ':param'));
-        extractRoutes(layer.handle.stack, routerPath);
-      }
-    });
-  };
-  extractRoutes(app._router.stack);
-  res.json({ routes: routes.sort() });
-});
-
-/* ===================== 404 HANDLER ===================== */
+/* =========================================================
+   404 ROUTE HANDLER
+========================================================= */
 app.use((req, res) => {
-  console.log(`404 - Route not found: ${req.method} ${req.url}`);
   res.status(404).json({
-    success: false,
-    message: `Route not found: ${req.method} ${req.url}`,
+    message: "Route not found",
   });
 });
 
-/* ===================== ERROR HANDLER ===================== */
+/* =========================================================
+   GLOBAL ERROR HANDLER
+========================================================= */
 app.use((err, req, res, next) => {
-  console.error("❌ Error:", err);
+  console.error("❌ Error:", err.message);
+
   res.status(500).json({
-    success: false,
     message: "Internal Server Error",
-    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    error: err.message,
   });
 });
 
-/* ===================== SERVER ===================== */
+/* =========================================================
+   SERVER
+========================================================= */
 const PORT = process.env.PORT || 5010;
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📁 Uploads directory: ${uploadsDir}`);
-  console.log(`🔗 Static files served at: /uploads`);
-  console.log(`📝 Blog API available at: /api/blogs`);
+  console.log(
+    `🚀 Server running on port ${PORT}`
+  );
 });
