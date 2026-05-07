@@ -6,7 +6,6 @@ const blogSchema = new mongoose.Schema(
       type: String,
       required: [true, "Title is required"],
       trim: true,
-      unique: true,
     },
     slug: {
       type: String,
@@ -61,11 +60,14 @@ const blogSchema = new mongoose.Schema(
 // Create slug from title before saving
 blogSchema.pre("save", function (next) {
   if (this.isModified("title")) {
-    this.slug = this.title
+    // Create base slug
+    let baseSlug = this.title
       .toLowerCase()
-      .replace(/[^a-zA-Z0-9]/g, "-")
-      .replace(/-+/g, "-")
+      .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
+    
+    // Add timestamp to ensure uniqueness
+    this.slug = `${baseSlug}-${Date.now()}`;
   }
   next();
 });
