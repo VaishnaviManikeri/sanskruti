@@ -50,16 +50,26 @@ exports.getBlogBySlug = async (req, res) => {
 // Create blog
 exports.createBlog = async (req, res) => {
   try {
-    console.log("Request body:", req.body);
-    console.log("File:", req.file);
+    console.log("=== CREATE BLOG DEBUG ===");
+    console.log("File received:", req.file);
+    console.log("Body:", req.body);
     
-    // Parse blog data
+    // Parse blog data from form-data
     let blogData;
     try {
-      blogData = JSON.parse(req.body.blogData);
+      // Check if blogData is in req.body.blogData (stringified JSON)
+      if (req.body.blogData) {
+        blogData = JSON.parse(req.body.blogData);
+      } else {
+        // If data is sent directly
+        blogData = req.body;
+      }
     } catch (e) {
+      console.error("Parse error:", e);
       blogData = req.body;
     }
+    
+    console.log("Parsed blog data:", blogData);
     
     // Validate required fields
     if (!blogData.title) {
@@ -76,15 +86,17 @@ exports.createBlog = async (req, res) => {
       });
     }
     
-    // Calculate reading time (approx 200 words per minute)
+    // Calculate reading time
     const plainText = blogData.content.replace(/<[^>]*>/g, '');
     const wordCount = plainText.split(/\s+/).filter(word => word.length > 0).length;
     const readingTime = Math.max(1, Math.ceil(wordCount / 200));
     
     // Handle featured image
-    let featuredImage = blogData.featuredImage;
+    let featuredImage = null;
     if (req.file) {
       featuredImage = `/uploads/${req.file.filename}`;
+    } else if (blogData.featuredImage && typeof blogData.featuredImage === 'string') {
+      featuredImage = blogData.featuredImage;
     }
     
     if (!featuredImage) {
@@ -99,14 +111,16 @@ exports.createBlog = async (req, res) => {
       title: blogData.title,
       author: blogData.author || "Admin",
       content: blogData.content,
-      metaTitle: blogData.metaTitle,
-      metaDescription: blogData.metaDescription,
+      metaTitle: blogData.metaTitle || blogData.title,
+      metaDescription: blogData.metaDescription || blogData.title.substring(0, 160),
       featuredImage: featuredImage,
       readingTime: readingTime,
       published: blogData.published !== undefined ? blogData.published : true,
     });
     
     await blog.save();
+    
+    console.log("Blog created successfully:", blog._id);
     
     res.status(201).json({
       success: true,
@@ -125,6 +139,10 @@ exports.createBlog = async (req, res) => {
 // Update blog
 exports.updateBlog = async (req, res) => {
   try {
+    console.log("=== UPDATE BLOG DEBUG ===");
+    console.log("File received:", req.file);
+    console.log("Body:", req.body);
+    
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
       return res.status(404).json({ 
@@ -136,8 +154,13 @@ exports.updateBlog = async (req, res) => {
     // Parse blog data
     let blogData;
     try {
-      blogData = JSON.parse(req.body.blogData);
+      if (req.body.blogData) {
+        blogData = JSON.parse(req.body.blogData);
+      } else {
+        blogData = req.body;
+      }
     } catch (e) {
+      console.error("Parse error:", e);
       blogData = req.body;
     }
     
@@ -150,12 +173,11 @@ exports.updateBlog = async (req, res) => {
     let featuredImage = blog.featuredImage;
     if (req.file) {
       // Delete old image if exists
-      if (blog.featuredImage && fs.existsSync(path.join(__dirname, "../", blog.featuredImage))) {
-        fs.unlinkSync(path.join(__dirname, "../", blog.featuredImage));
+      const oldImagePath = path.join(__dirname, "../", blog.featuredImage);
+      if (fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
       }
       featuredImage = `/uploads/${req.file.filename}`;
-    } else if (blogData.featuredImage && blogData.featuredImage !== blog.featuredImage) {
-      featuredImage = blogData.featuredImage;
     }
     
     // Update blog
