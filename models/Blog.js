@@ -3,66 +3,73 @@ const mongoose = require('mongoose');
 const blogSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: [true, 'Title is required'],
+    required: true,
     trim: true,
-    maxlength: [200, 'Title cannot exceed 200 characters']
   },
   slug: {
     type: String,
+    required: true,
     unique: true,
-    sparse: true
-  },
-  content: {
-    type: String,
-    required: [true, 'Content is required']
-  },
-  excerpt: {
-    type: String,
-    maxlength: [300, 'Excerpt cannot exceed 300 characters']
-  },
-  featuredImage: {
-    type: String,
-    required: [true, 'Featured image is required']
+    trim: true,
+    lowercase: true,
   },
   author: {
     type: String,
-    default: 'Admin'
+    required: true,
+    default: 'Admin',
+  },
+  content: {
+    type: String,
+    required: true,
+  },
+  excerpt: {
+    type: String,
+    required: true,
+    maxLength: 200,
+  },
+  featuredImage: {
+    type: String,
+    required: true,
   },
   readingTime: {
     type: Number,
-    default: 5
+    default: 5,
+  },
+  metaTitle: {
+    type: String,
+    required: true,
+  },
+  metaDescription: {
+    type: String,
+    required: true,
   },
   tags: [{
     type: String,
-    trim: true
   }],
+  views: {
+    type: Number,
+    default: 0,
+  },
   status: {
     type: String,
     enum: ['draft', 'published'],
-    default: 'published'
+    default: 'published',
   },
-  views: {
-    type: Number,
-    default: 0
-  },
-  metaTitle: String,
-  metaDescription: String,
   publishedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 }, {
-  timestamps: true
+  timestamps: true,
 });
 
 // Generate slug from title before saving
 blogSchema.pre('save', function(next) {
-  if (this.title && !this.slug) {
+  if (this.isModified('title')) {
     this.slug = this.title
       .toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .replace(/\s+/g, '-')
-      .substring(0, 100);
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
   }
   next();
 });
