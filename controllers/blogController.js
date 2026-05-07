@@ -1,276 +1,82 @@
-const Blog = require('../models/Blog');
-const fs = require('fs');
-const path = require('path');
+const Blog = require("../models/Blog");
+const slugify = require("slugify");
 
-// @desc    Get all blogs
-// @route   GET /api/blogs
-// @access  Public
-const getBlogs = async (req, res) => {
+exports.createBlog = async (req, res) => {
   try {
-    const blogs = await Blog.find({ status: 'published' })
-      .sort({ publishedAt: -1 })
-      .select('-content');
-    
-    res.status(200).json({
-      success: true,
-      data: blogs,
-    });
-  } catch (error) {
-    console.error('Error fetching blogs:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch blogs',
-    });
-  }
-};
+    const slug = slugify(req.body.title, { lower: true });
 
-// @desc    Get single blog by ID
-// @route   GET /api/blogs/:id
-// @access  Public
-const getBlogById = async (req, res) => {
-  try {
-    const blog = await Blog.findById(req.params.id);
-    
-    if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Blog not found',
-      });
-    }
-    
-    // Increment view count
-    blog.views += 1;
+    const blog = new Blog({
+      ...req.body,
+      slug,
+      coverImage: req.file
+        ? `/uploads/blogs/${req.file.filename}`
+        : "",
+    });
+
     await blog.save();
-    
-    res.status(200).json({
-      success: true,
-      data: blog,
-    });
+
+    res.status(201).json(blog);
   } catch (error) {
-    console.error('Error fetching blog:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch blog',
-    });
+    res.status(500).json(error.message);
   }
 };
 
-// @desc    Get single blog by slug
-// @route   GET /api/blogs/slug/:slug
-// @access  Public
-const getBlogBySlug = async (req, res) => {
+exports.getBlogs = async (req, res) => {
   try {
-    const blog = await Blog.findOne({ slug: req.params.slug, status: 'published' });
-    
-    if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Blog not found',
-      });
-    }
-    
-    // Increment view count
-    blog.views += 1;
-    await blog.save();
-    
-    res.status(200).json({
-      success: true,
-      data: blog,
-    });
+    const blogs = await Blog.find().sort({ createdAt: -1 });
+
+    res.json(blogs);
   } catch (error) {
-    console.error('Error fetching blog:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch blog',
-    });
+    res.status(500).json(error.message);
   }
 };
 
-// @desc    Create a blog
-// @route   POST /api/blogs
-// @access  Private
-const createBlog = async (req, res) => {
+exports.getBlogBySlug = async (req, res) => {
   try {
-    const { title, author, content, excerpt, featuredImage, metaTitle, metaDescription, tags, readingTime } = req.body;
-    
-    // Calculate reading time if not provided
-    let finalReadingTime = readingTime;
-    if (!finalReadingTime && content) {
-      const wordsPerMinute = 200;
-      const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
-      finalReadingTime = Math.max(1, Math.ceil(wordCount / wordsPerMinute));
-    }
-    
-    const blog = await Blog.create({
-      title,
-      author: author || 'Admin',
-      content,
-      excerpt,
-      featuredImage,
-      metaTitle: metaTitle || title,
-      metaDescription: metaDescription || excerpt,
-      tags: tags || [],
-      readingTime: finalReadingTime || 5,
+    const blog = await Blog.findOne({
+      slug: req.params.slug,
     });
-    
-    res.status(201).json({
-      success: true,
-      data: blog,
-    });
+
+    res.json(blog);
   } catch (error) {
-    console.error('Error creating blog:', error);
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'A blog with this title already exists',
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create blog',
-    });
+    res.status(500).json(error.message);
   }
 };
 
-// @desc    Update a blog
-// @route   PUT /api/blogs/:id
-// @access  Private
-const updateBlog = async (req, res) => {
+exports.updateBlog = async (req, res) => {
   try {
-    const blog = await Blog.findById(req.params.id);
-    
-    if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Blog not found',
-      });
+    const slug = slugify(req.body.title, { lower: true });
+
+    const updatedData = {
+      ...req.body,
+      slug,
+    };
+
+    if (req.file) {
+      updatedData.coverImage =
+        `/uploads/blogs/${req.file.filename}`;
     }
-    
-    const { title, author, content, excerpt, featuredImage, metaTitle, metaDescription, tags, readingTime, status } = req.body;
-    
-    // Calculate reading time if content changed
-    let finalReadingTime = readingTime;
-    if (!finalReadingTime && content) {
-      const wordsPerMinute = 200;
-      const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
-      finalReadingTime = Math.max(1, Math.ceil(wordCount / wordsPerMinute));
-    }
-    
-    const updatedBlog = await Blog.findByIdAndUpdate(
+
+    const blog = await Blog.findByIdAndUpdate(
       req.params.id,
-      {
-        title: title || blog.title,
-        author: author || blog.author,
-        content: content || blog.content,
-        excerpt: excerpt || blog.excerpt,
-        featuredImage: featuredImage || blog.featuredImage,
-        metaTitle: metaTitle || blog.metaTitle,
-        metaDescription: metaDescription || blog.metaDescription,
-        tags: tags || blog.tags,
-        readingTime: finalReadingTime || blog.readingTime,
-        status: status || blog.status,
-      },
-      { new: true, runValidators: true }
+      updatedData,
+      { new: true }
     );
-    
-    res.status(200).json({
-      success: true,
-      data: updatedBlog,
-    });
+
+    res.json(blog);
   } catch (error) {
-    console.error('Error updating blog:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update blog',
-    });
+    res.status(500).json(error.message);
   }
 };
 
-// @desc    Delete a blog
-// @route   DELETE /api/blogs/:id
-// @access  Private
-const deleteBlog = async (req, res) => {
+exports.deleteBlog = async (req, res) => {
   try {
-    const blog = await Blog.findById(req.params.id);
-    
-    if (!blog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Blog not found',
-      });
-    }
-    
-    await blog.deleteOne();
-    
-    res.status(200).json({
-      success: true,
-      message: 'Blog deleted successfully',
+    await Blog.findByIdAndDelete(req.params.id);
+
+    res.json({
+      message: "Blog Deleted",
     });
   } catch (error) {
-    console.error('Error deleting blog:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete blog',
-    });
+    res.status(500).json(error.message);
   }
-};
-
-// @desc    Upload blog image
-// @route   POST /api/blogs/upload-image
-// @access  Private
-const uploadImage = async (req, res) => {
-  try {
-    console.log('=== UPLOAD IMAGE FUNCTION CALLED ===');
-    console.log('Request file:', req.file);
-    console.log('Request body:', req.body);
-    
-    if (!req.file) {
-      console.log('No file in request');
-      return res.status(400).json({
-        success: false,
-        message: 'No image file provided. Please select an image file.',
-      });
-    }
-    
-    // Get the base URL from environment or construct it
-    const baseUrl = process.env.BASE_URL || 'https://api.sanskrutitechnoschool.com';
-    const imageUrl = `/uploads/${req.file.filename}`;
-    const fullUrl = `${baseUrl}${imageUrl}`;
-    
-    console.log('Image uploaded successfully:', {
-      filename: req.file.filename,
-      size: req.file.size,
-      imageUrl: imageUrl,
-      fullUrl: fullUrl
-    });
-    
-    res.status(200).json({
-      success: true,
-      message: 'Image uploaded successfully',
-      url: imageUrl,
-      data: {
-        url: imageUrl,
-        fullUrl: fullUrl,
-        filename: req.file.filename,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-      },
-    });
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to upload image: ' + error.message,
-    });
-  }
-};
-
-module.exports = {
-  getBlogs,
-  getBlogById,
-  getBlogBySlug,
-  createBlog,
-  updateBlog,
-  deleteBlog,
-  uploadImage,
 };
