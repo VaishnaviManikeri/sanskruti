@@ -11,20 +11,32 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// Ensure uploads directory exists
+// Fix: Use absolute path for uploads directory
 const uploadDir = path.join(__dirname, "../uploads");
+
+// Ensure uploads directory exists with proper permissions
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("Created uploads directory at:", uploadDir);
 }
+
+// Log the upload directory path for debugging
+console.log("Uploads directory path:", uploadDir);
 
 // Configure multer for image upload with increased limits
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
+    // Verify directory exists before saving
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, "blog-" + uniqueSuffix + path.extname(file.originalname));
+    const filename = "blog-" + uniqueSuffix + path.extname(file.originalname);
+    console.log("Saving file as:", filename);
+    cb(null, filename);
   },
 });
 
@@ -43,8 +55,8 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: { 
-    fileSize: 10 * 1024 * 1024, // Increase to 10MB limit
-    fieldSize: 50 * 1024 * 1024 // Increase field size limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fieldSize: 50 * 1024 * 1024 // 50MB field size limit
   },
   fileFilter: fileFilter,
 });
