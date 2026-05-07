@@ -220,8 +220,9 @@ const deleteBlog = async (req, res) => {
 // @access  Private
 const uploadImage = async (req, res) => {
   try {
-    console.log('Upload image request received');
+    console.log('=== UPLOAD IMAGE FUNCTION CALLED ===');
     console.log('Request file:', req.file);
+    console.log('Request body:', req.body);
     
     if (!req.file) {
       console.log('No file in request');
@@ -231,11 +232,17 @@ const uploadImage = async (req, res) => {
       });
     }
     
-    // Get the uploaded file URL
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    // Get the base URL from environment or construct it
+    const baseUrl = process.env.BASE_URL || 'https://api.sanskrutitechnoschool.com';
     const imageUrl = `/uploads/${req.file.filename}`;
+    const fullUrl = `${baseUrl}${imageUrl}`;
     
-    console.log('Image uploaded successfully:', imageUrl);
+    console.log('Image uploaded successfully:', {
+      filename: req.file.filename,
+      size: req.file.size,
+      imageUrl: imageUrl,
+      fullUrl: fullUrl
+    });
     
     res.status(200).json({
       success: true,
@@ -243,8 +250,10 @@ const uploadImage = async (req, res) => {
       url: imageUrl,
       data: {
         url: imageUrl,
+        fullUrl: fullUrl,
         filename: req.file.filename,
         size: req.file.size,
+        mimetype: req.file.mimetype,
       },
     });
   } catch (error) {
