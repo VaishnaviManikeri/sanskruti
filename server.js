@@ -188,11 +188,7 @@ app.use(
 );
 
 /* BLOG ROUTE */
-app.use(
-  "/api/blogs",
-  require("./routes/blog")
-);
-
+app.use("/api/blogs", require("./routes/blog"));
 /* ===================== 404 HANDLER ===================== */
 
 app.use((req, res) => {
