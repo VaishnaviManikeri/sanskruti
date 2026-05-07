@@ -2,12 +2,30 @@ const Blog = require("../models/Blog");
 const fs = require("fs");
 const path = require("path");
 
-// Get all blogs
+// Helper function to generate slug
+const generateSlug = (title) => {
+  return title
+    .toLowerCase()
+    .replace(/[^a-zA-Z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+};
+
+// Get all blogs (for admin - includes unpublished)
 exports.getAllBlogs = async (req, res) => {
   try {
-    const blogs = await Blog.find({ published: true })
+    // Check if admin (has token) vs public
+    const isAdmin = req.headers.authorization;
+    let query = {};
+    
+    if (!isAdmin) {
+      query = { published: true };
+    }
+    
+    const blogs = await Blog.find(query)
       .sort({ publishedAt: -1 })
       .select("-content");
+      
     res.status(200).json({
       success: true,
       data: blogs
@@ -31,9 +49,19 @@ exports.getBlogBySlug = async (req, res) => {
         message: "Blog not found" 
       });
     }
+    
+    // Only show unpublished to admins
+    if (!blog.published && !req.headers.authorization) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Blog not found" 
+      });
+    }
+    
     // Increment views
     blog.views += 1;
     await blog.save();
+    
     res.status(200).json({
       success: true,
       data: blog
@@ -57,11 +85,9 @@ exports.createBlog = async (req, res) => {
     // Parse blog data from form-data
     let blogData;
     try {
-      // Check if blogData is in req.body.blogData (stringified JSON)
       if (req.body.blogData) {
         blogData = JSON.parse(req.body.blogData);
       } else {
-        // If data is sent directly
         blogData = req.body;
       }
     } catch (e) {
@@ -72,18 +98,28 @@ exports.createBlog = async (req, res) => {
     console.log("Parsed blog data:", blogData);
     
     // Validate required fields
-    if (!blogData.title) {
+    if (!blogData.title || !blogData.title.trim()) {
       return res.status(400).json({ 
         success: false,
         message: "Title is required" 
       });
     }
     
-    if (!blogData.content) {
+    if (!blogData.content || blogData.content === '<p><br></p>') {
       return res.status(400).json({ 
         success: false,
         message: "Content is required" 
       });
+    }
+    
+    // Check if slug already exists
+    let slug = generateSlug(blogData.title);
+    let existingBlog = await Blog.findOne({ slug });
+    let counter = 1;
+    while (existingBlog) {
+      slug = `${generateSlug(blogData.title)}-${counter}`;
+      existingBlog = await Blog.findOne({ slug });
+      counter++;
     }
     
     // Calculate reading time
@@ -108,19 +144,21 @@ exports.createBlog = async (req, res) => {
     
     // Create blog
     const blog = new Blog({
-      title: blogData.title,
-      author: blogData.author || "Admin",
+      title: blogData.title.trim(),
+      author: blogData.author?.trim() || "Admin",
       content: blogData.content,
-      metaTitle: blogData.metaTitle || blogData.title,
-      metaDescription: blogData.metaDescription || blogData.title.substring(0, 160),
+      metaTitle: blogData.metaTitle?.trim() || blogData.title.trim(),
+      metaDescription: blogData.metaDescription?.trim() || blogData.title.substring(0, 160),
       featuredImage: featuredImage,
       readingTime: readingTime,
       published: blogData.published !== undefined ? blogData.published : true,
+      publishedAt: blogData.published !== false ? new Date() : null,
+      slug: slug,
     });
     
     await blog.save();
     
-    console.log("Blog created successfully:", blog._id);
+    console.log("Blog created successfully:", blog._id, "Slug:", blog.slug);
     
     res.status(201).json({
       success: true,
@@ -164,31 +202,55 @@ exports.updateBlog = async (req, res) => {
       blogData = req.body;
     }
     
-    // Calculate reading time
-    const plainText = blogData.content.replace(/<[^>]*>/g, '');
-    const wordCount = plainText.split(/\s+/).filter(word => word.length > 0).length;
-    const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+    // Calculate reading time if content changed
+    let readingTime = blog.readingTime;
+    if (blogData.content && blogData.content !== blog.content) {
+      const plainText = blogData.content.replace(/<[^>]*>/g, '');
+      const wordCount = plainText.split(/\s+/).filter(word => word.length > 0).length;
+      readingTime = Math.max(1, Math.ceil(wordCount / 200));
+    }
     
     // Handle featured image
     let featuredImage = blog.featuredImage;
     if (req.file) {
-      // Delete old image if exists
-      const oldImagePath = path.join(__dirname, "../", blog.featuredImage);
-      if (fs.existsSync(oldImagePath)) {
-        fs.unlinkSync(oldImagePath);
+      // Delete old image if exists and it's not a default image
+      if (blog.featuredImage && blog.featuredImage !== '/uploads/default.jpg') {
+        const oldImagePath = path.join(__dirname, "../", blog.featuredImage);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
       }
       featuredImage = `/uploads/${req.file.filename}`;
     }
     
-    // Update blog
-    blog.title = blogData.title || blog.title;
-    blog.author = blogData.author || blog.author;
+    // Update slug if title changed
+    let slug = blog.slug;
+    if (blogData.title && blogData.title !== blog.title) {
+      slug = generateSlug(blogData.title);
+      let existingBlog = await Blog.findOne({ slug, _id: { $ne: blog._id } });
+      let counter = 1;
+      while (existingBlog) {
+        slug = `${generateSlug(blogData.title)}-${counter}`;
+        existingBlog = await Blog.findOne({ slug, _id: { $ne: blog._id } });
+        counter++;
+      }
+    }
+    
+    // Update blog fields
+    blog.title = blogData.title?.trim() || blog.title;
+    blog.slug = slug;
+    blog.author = blogData.author?.trim() || blog.author;
     blog.content = blogData.content || blog.content;
-    blog.metaTitle = blogData.metaTitle || blog.metaTitle;
-    blog.metaDescription = blogData.metaDescription || blog.metaDescription;
+    blog.metaTitle = blogData.metaTitle?.trim() || blog.metaTitle;
+    blog.metaDescription = blogData.metaDescription?.trim() || blog.metaDescription;
     blog.featuredImage = featuredImage;
     blog.readingTime = readingTime;
     blog.published = blogData.published !== undefined ? blogData.published : blog.published;
+    
+    // Update publishedAt if being published now
+    if (blogData.published === true && !blog.published) {
+      blog.publishedAt = new Date();
+    }
     
     await blog.save();
     
@@ -218,7 +280,7 @@ exports.deleteBlog = async (req, res) => {
     }
     
     // Delete featured image
-    if (blog.featuredImage) {
+    if (blog.featuredImage && blog.featuredImage !== '/uploads/default.jpg') {
       const imagePath = path.join(__dirname, "../", blog.featuredImage);
       if (fs.existsSync(imagePath)) {
         fs.unlinkSync(imagePath);
