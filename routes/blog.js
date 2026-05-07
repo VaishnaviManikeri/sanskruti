@@ -12,7 +12,7 @@ const {
   deleteBlog,
   uploadImage
 } = require('../controllers/blogController');
-const { protect } = require('../middleware/auth');
+const { protect } = require('../middleware/auth'); // Using your existing auth middleware
 
 // Configure multer for image upload
 const storage = multer.diskStorage({
@@ -52,7 +52,7 @@ router.get('/', getBlogs);
 router.get('/:id', getBlogById);
 router.get('/slug/:slug', getBlogBySlug);
 
-// Protected routes
+// Protected routes (using your existing protect middleware)
 router.post('/', protect, createBlog);
 router.put('/:id', protect, updateBlog);
 router.delete('/:id', protect, deleteBlog);
