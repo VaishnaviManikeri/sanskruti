@@ -12,7 +12,7 @@ const {
   deleteBlog,
   uploadImage
 } = require('../controllers/blogController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/auth');
 
 // Configure multer for image upload
 const storage = multer.diskStorage({
