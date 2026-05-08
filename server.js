@@ -10,25 +10,29 @@ dotenv.config();
 const app = express();
 
 /* =========================================================
-   CORS CONFIGURATION
+   CORS CONFIGURATION - FIXED
 ========================================================= */
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "https://sanskrutitechnoschool.com",
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://sanskrutitechnoschool.com",
+    "https://sanskruti-ylz5.onrender.com"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+
+// Handle preflight requests
+app.options('*', cors());
 
 /* =========================================================
-   BODY PARSER
+   BODY PARSER - Increase limit for images
 ========================================================= */
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 /* =========================================================
    STATIC FILES
@@ -57,28 +61,6 @@ app.get("/ping", (req, res) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
-});
-
-/* =========================================================
-   HOSTINGER BACKEND STATUS CHECK
-========================================================= */
-app.get("/hostinger-status", async (req, res) => {
-  try {
-    const response = await axios.get(
-      process.env.HOSTINGER_BACKEND_URL ||
-        "https://your-hostinger-backend.com"
-    );
-
-    res.status(200).json({
-      status: "Hostinger backend reachable ✅",
-      data: response.data,
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: "Hostinger backend unreachable ❌",
-      error: error.message,
-    });
-  }
 });
 
 /* =========================================================
@@ -116,11 +98,9 @@ app.use(
 // CAREER ROUTES
 app.use("/api/careers", require("./routes/careers"));
 
-/* =========================================================
-   BLOG ROUTES
-========================================================= */
 // BLOG ROUTES
 app.use("/api/blogs", require("./routes/blogs"));
+
 /* =========================================================
    404 ROUTE HANDLER
 ========================================================= */
@@ -135,7 +115,11 @@ app.use((req, res) => {
 ========================================================= */
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
-
+  
+  if (err.message === 'Only image files are allowed') {
+    return res.status(400).json({ message: err.message });
+  }
+  
   res.status(500).json({
     message: "Internal Server Error",
     error: err.message,
