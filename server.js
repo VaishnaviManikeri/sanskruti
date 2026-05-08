@@ -10,57 +10,36 @@ dotenv.config();
 const app = express();
 
 /* =========================================================
-   CORS CONFIGURATION
+   CORS CONFIGURATION - FIXED
 ========================================================= */
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://sanskrutitechnoschool.com",
-      "https://sanskruti-ylz5.onrender.com",
-    ],
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "DELETE",
-      "OPTIONS",
-      "PATCH",
-    ],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Accept",
-    ],
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://sanskrutitechnoschool.com",
+    "https://sanskruti-ylz5.onrender.com"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+
+// Handle preflight requests
+app.options('*', cors());
 
 /* =========================================================
-   BODY PARSER
+   BODY PARSER - Increase limit for images
 ========================================================= */
-app.use(
-  express.json({
-    limit: "10mb",
-  })
-);
-
-app.use(
-  express.urlencoded({
-    extended: true,
-    limit: "10mb",
-  })
-);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 /* =========================================================
    STATIC FILES
 ========================================================= */
 app.use(
   "/uploads",
-  express.static(
-    path.join(__dirname, "uploads")
-  )
+  express.static(path.join(__dirname, "uploads"))
 );
 
 /* =========================================================
@@ -97,7 +76,6 @@ mongoose
       "❌ MongoDB connection error:",
       err.message
     );
-
     process.exit(1);
   });
 
@@ -106,16 +84,10 @@ mongoose
 ========================================================= */
 
 // AUTH ROUTES
-app.use(
-  "/api/auth",
-  require("./routes/auth")
-);
+app.use("/api/auth", require("./routes/auth"));
 
 // GALLERY ROUTES
-app.use(
-  "/api/gallery",
-  require("./routes/gallery")
-);
+app.use("/api/gallery", require("./routes/gallery"));
 
 // ANNOUNCEMENT ROUTES
 app.use(
@@ -124,16 +96,10 @@ app.use(
 );
 
 // CAREER ROUTES
-app.use(
-  "/api/careers",
-  require("./routes/careers")
-);
+app.use("/api/careers", require("./routes/careers"));
 
 // BLOG ROUTES
-app.use(
-  "/api/blogs",
-  require("./routes/blogs")
-);
+app.use("/api/blogs", require("./routes/blogs"));
 
 /* =========================================================
    404 ROUTE HANDLER
@@ -148,20 +114,12 @@ app.use((req, res) => {
    GLOBAL ERROR HANDLER
 ========================================================= */
 app.use((err, req, res, next) => {
-  console.error(
-    "❌ Error:",
-    err.message
-  );
-
-  if (
-    err.message ===
-    "Only image files are allowed"
-  ) {
-    return res.status(400).json({
-      message: err.message,
-    });
+  console.error("❌ Error:", err.message);
+  
+  if (err.message === 'Only image files are allowed') {
+    return res.status(400).json({ message: err.message });
   }
-
+  
   res.status(500).json({
     message: "Internal Server Error",
     error: err.message,
@@ -171,8 +129,7 @@ app.use((err, req, res, next) => {
 /* =========================================================
    SERVER
 ========================================================= */
-const PORT =
-  process.env.PORT || 5010;
+const PORT = process.env.PORT || 5010;
 
 app.listen(PORT, () => {
   console.log(
