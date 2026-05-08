@@ -12,21 +12,35 @@ const app = express();
 /* =========================================================
    CORS CONFIGURATION - FIXED
 ========================================================= */
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://sanskrutitechnoschool.com",
+  "https://sanskruti-ylz5.onrender.com"
+];
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://sanskrutitechnoschool.com",
-    "https://sanskruti-ylz5.onrender.com"
-  ],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   credentials: true,
   optionsSuccessStatus: 200
 }));
 
-// Handle preflight requests
-app.options('*', cors());
+// REMOVE THIS LINE - it's causing the error:
+// app.options('*', cors());
+
+// Instead, use this for preflight requests (if needed):
+app.options('/api/*', cors()); // This is safe
 
 /* =========================================================
    BODY PARSER - Increase limit for images
@@ -61,6 +75,28 @@ app.get("/ping", (req, res) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
+});
+
+/* =========================================================
+   HOSTINGER BACKEND STATUS CHECK
+========================================================= */
+app.get("/hostinger-status", async (req, res) => {
+  try {
+    const response = await axios.get(
+      process.env.HOSTINGER_BACKEND_URL ||
+        "https://your-hostinger-backend.com"
+    );
+
+    res.status(200).json({
+      status: "Hostinger backend reachable ✅",
+      data: response.data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "Hostinger backend unreachable ❌",
+      error: error.message,
+    });
+  }
 });
 
 /* =========================================================
@@ -118,6 +154,10 @@ app.use((err, req, res, next) => {
   
   if (err.message === 'Only image files are allowed') {
     return res.status(400).json({ message: err.message });
+  }
+  
+  if (err.message && err.message.includes('CORS')) {
+    return res.status(403).json({ message: err.message });
   }
   
   res.status(500).json({
