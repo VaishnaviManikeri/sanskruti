@@ -10,43 +10,25 @@ dotenv.config();
 const app = express();
 
 /* =========================================================
-   CORS CONFIGURATION - FIXED
+   CORS CONFIGURATION
 ========================================================= */
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://sanskrutitechnoschool.com",
-  "https://sanskruti-ylz5.onrender.com"
-];
-
-app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
-
-// REMOVE THIS LINE - it's causing the error:
-// app.options('*', cors());
-
-// Instead, use this for preflight requests (if needed):
-app.options('/api/*', cors()); // This is safe
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://sanskrutitechnoschool.com",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 /* =========================================================
-   BODY PARSER - Increase limit for images
+   BODY PARSER
 ========================================================= */
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 /* =========================================================
    STATIC FILES
@@ -134,9 +116,11 @@ app.use(
 // CAREER ROUTES
 app.use("/api/careers", require("./routes/careers"));
 
+/* =========================================================
+   BLOG ROUTES
+========================================================= */
 // BLOG ROUTES
 app.use("/api/blogs", require("./routes/blogs"));
-
 /* =========================================================
    404 ROUTE HANDLER
 ========================================================= */
@@ -151,15 +135,7 @@ app.use((req, res) => {
 ========================================================= */
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
-  
-  if (err.message === 'Only image files are allowed') {
-    return res.status(400).json({ message: err.message });
-  }
-  
-  if (err.message && err.message.includes('CORS')) {
-    return res.status(403).json({ message: err.message });
-  }
-  
+
   res.status(500).json({
     message: "Internal Server Error",
     error: err.message,
