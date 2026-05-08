@@ -6,13 +6,15 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+// Ensure uploads directory exists
+const uploadDir = 'uploads/blogs';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 // Configure multer for image uploads
 const storage = multer.diskStorage({
   destination: function(req, file, cb) {
-    const uploadDir = 'uploads/blogs';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
     cb(null, uploadDir);
   },
   filename: function(req, file, cb) {
@@ -64,6 +66,7 @@ router.get('/', async (req, res) => {
       total
     });
   } catch (error) {
+    console.error('Error fetching blogs:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -82,6 +85,7 @@ router.get('/:slug', async (req, res) => {
     
     res.json(blog);
   } catch (error) {
+    console.error('Error fetching blog:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -92,6 +96,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
     const blogs = await Blog.find().sort({ createdAt: -1 });
     res.json(blogs);
   } catch (error) {
+    console.error('Error fetching admin blogs:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -105,6 +110,7 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
     }
     res.json(blog);
   } catch (error) {
+    console.error('Error fetching blog by ID:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -112,20 +118,33 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
 // CREATE blog (protected)
 router.post('/', authMiddleware, upload.single('featuredImage'), async (req, res) => {
   try {
-    const blogData = JSON.parse(req.body.data);
+    console.log('Creating blog...');
+    console.log('Request body data:', req.body.data);
     
-    if (!req.file) {
+    let blogData;
+    try {
+      blogData = JSON.parse(req.body.data);
+    } catch (e) {
+      return res.status(400).json({ message: 'Invalid JSON data' });
+    }
+    
+    if (!req.file && !blogData.featuredImage) {
       return res.status(400).json({ message: 'Featured image is required' });
     }
     
-    blogData.featuredImage = `/uploads/blogs/${req.file.filename}`;
+    if (req.file) {
+      blogData.featuredImage = `/uploads/blogs/${req.file.filename}`;
+    }
+    
     blogData.author = blogData.author || 'Admin';
     
     const blog = new Blog(blogData);
     await blog.save();
     
+    console.log('Blog created successfully:', blog._id);
     res.status(201).json(blog);
   } catch (error) {
+    console.error('Error creating blog:', error);
     res.status(400).json({ message: error.message });
   }
 });
@@ -138,7 +157,12 @@ router.put('/:id', authMiddleware, upload.single('featuredImage'), async (req, r
       return res.status(404).json({ message: 'Blog not found' });
     }
     
-    const blogData = JSON.parse(req.body.data);
+    let blogData;
+    try {
+      blogData = JSON.parse(req.body.data);
+    } catch (e) {
+      return res.status(400).json({ message: 'Invalid JSON data' });
+    }
     
     if (req.file) {
       // Delete old image if exists
@@ -154,8 +178,10 @@ router.put('/:id', authMiddleware, upload.single('featuredImage'), async (req, r
     Object.assign(blog, blogData);
     await blog.save();
     
+    console.log('Blog updated successfully:', blog._id);
     res.json(blog);
   } catch (error) {
+    console.error('Error updating blog:', error);
     res.status(400).json({ message: error.message });
   }
 });
@@ -177,8 +203,10 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
     
     await blog.deleteOne();
+    console.log('Blog deleted successfully:', blog._id);
     res.json({ message: 'Blog deleted successfully' });
   } catch (error) {
+    console.error('Error deleting blog:', error);
     res.status(500).json({ message: error.message });
   }
 });
