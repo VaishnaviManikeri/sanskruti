@@ -1,24 +1,33 @@
-const express = require('express');
+const express = require("express");
+
 const router = express.Router();
+
+const uploadBlog = require("../middleware/uploadBlog");
+
 const {
-  getAllBlogs,
+  getBlogs,
   getBlogBySlug,
-  getBlogById,
   createBlog,
   updateBlog,
-  deleteBlog
-} = require('../controllers/blogController');
-const { protect } = require('../middleware/auth');
-const upload = require('../middleware/uploadBlog');
+  deleteBlog,
+} = require("../controllers/blogController");
 
-// Public routes
-router.get('/', getAllBlogs);
-router.get('/slug/:slug', getBlogBySlug);
-router.get('/:id', getBlogById);
+router.get("/", getBlogs);
 
-// Admin routes (protected)
-router.post('/', protect, upload.single('featuredImage'), createBlog);
-router.put('/:id', protect, upload.single('featuredImage'), updateBlog);
-router.delete('/:id', protect, deleteBlog);
+router.get("/:slug", getBlogBySlug);
+
+router.post(
+  "/",
+  uploadBlog.single("coverImage"),
+  createBlog
+);
+
+router.put(
+  "/:id",
+  uploadBlog.single("coverImage"),
+  updateBlog
+);
+
+router.delete("/:id", deleteBlog);
 
 module.exports = router;
