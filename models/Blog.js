@@ -3,8 +3,9 @@ const mongoose = require('mongoose');
 const blogSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true,
-    trim: true
+    required: [true, 'Title is required'],
+    trim: true,
+    maxlength: [200, 'Title cannot exceed 200 characters']
   },
   slug: {
     type: String,
@@ -13,69 +14,76 @@ const blogSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   },
-  author: {
-    type: String,
-    required: true,
-    default: 'Sanskruti Team'
-  },
   content: {
     type: String,
-    required: true
+    required: [true, 'Content is required']
   },
   excerpt: {
     type: String,
-    required: true,
-    maxLength: 200
+    required: [true, 'Excerpt is required'],
+    maxlength: [500, 'Excerpt cannot exceed 500 characters']
   },
   featuredImage: {
     type: String,
-    required: true
+    required: [true, 'Featured image is required']
   },
-  images: [{
-    url: String,
-    caption: String,
-    alt: String
-  }],
+  author: {
+    type: String,
+    required: [true, 'Author name is required'],
+    default: 'Admin'
+  },
+  authorImage: {
+    type: String,
+    default: ''
+  },
   readingTime: {
     type: Number,
     default: 5
-  },
-  metaTitle: {
-    type: String,
-    required: true
-  },
-  metaDescription: {
-    type: String,
-    required: true
   },
   tags: [{
     type: String,
     trim: true
   }],
+  metaTitle: {
+    type: String,
+    maxlength: [60, 'Meta title cannot exceed 60 characters']
+  },
+  metaDescription: {
+    type: String,
+    maxlength: [160, 'Meta description cannot exceed 160 characters']
+  },
+  status: {
+    type: String,
+    enum: ['draft', 'published'],
+    default: 'draft'
+  },
   views: {
     type: Number,
     default: 0
   },
-  published: {
-    type: Boolean,
-    default: true
-  },
   publishedAt: {
     type: Date,
     default: Date.now
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-// Generate slug from title before saving
+// Create slug from title before saving
 blogSchema.pre('save', function(next) {
-  if (this.isModified('title')) {
+  if (this.isModified('title') && !this.slug) {
     this.slug = this.title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
   }
+  this.updatedAt = Date.now();
   next();
 });
 
