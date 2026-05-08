@@ -5,67 +5,74 @@ const blogSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Title is required'],
     trim: true,
+    maxlength: [200, 'Title cannot exceed 200 characters']
   },
   slug: {
     type: String,
     required: true,
     unique: true,
-    trim: true,
     lowercase: true,
-  },
-  author: {
-    type: String,
-    required: [true, 'Author name is required'],
-    default: 'Admin',
+    trim: true
   },
   content: {
     type: String,
-    required: [true, 'Content is required'],
+    required: [true, 'Content is required']
+  },
+  excerpt: {
+    type: String,
+    required: [true, 'Excerpt is required'],
+    maxlength: [300, 'Excerpt cannot exceed 300 characters']
   },
   featuredImage: {
     type: String,
-    required: [true, 'Featured image is required'],
+    required: [true, 'Featured image is required']
   },
-  images: [{
+  author: {
     type: String,
-  }],
+    default: 'Admin'
+  },
+  readingTime: {
+    type: Number,
+    default: 5
+  },
   metaTitle: {
     type: String,
-    trim: true,
+    trim: true
   },
   metaDescription: {
     type: String,
     trim: true,
-  },
-  readingTime: {
-    type: Number,
-    default: 5,
+    maxlength: [160, 'Meta description cannot exceed 160 characters']
   },
   tags: [{
     type: String,
-    trim: true,
+    trim: true
   }],
+  views: {
+    type: Number,
+    default: 0
+  },
   status: {
     type: String,
     enum: ['draft', 'published'],
-    default: 'published',
+    default: 'published'
   },
-  views: {
-    type: Number,
-    default: 0,
-  },
-  createdAt: {
+  publishedAt: {
     type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
+    default: Date.now
+  }
+}, {
+  timestamps: true
 });
 
+// Generate slug from title before saving
 blogSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
+  if (this.isModified('title') && !this.slug) {
+    this.slug = this.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
   next();
 });
 
