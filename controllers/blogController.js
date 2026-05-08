@@ -1,216 +1,160 @@
-const Blog = require('../models/Blog');
-const path = require('path');
-const fs = require('fs');
+const Blog = require("../models/Blog");
+const slugify = require("slugify");
 
-// @desc    Get all blogs
-// @route   GET /api/blogs
-// @access  Public
-exports.getAllBlogs = async (req, res) => {
+const calculateReadingTime = (text) => {
+  const words = text.replace(/<[^>]+>/g, "").split(/\s+/).length;
+
+  const minutes = Math.ceil(words / 200);
+
+  return `${minutes} min read`;
+};
+
+exports.getBlogs = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status = 'published' } = req.query;
-    
-    const query = { status };
-    
-    const blogs = await Blog.find(query)
-      .sort({ publishedAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-    
-    const total = await Blog.countDocuments(query);
-    
-    res.json({
-      success: true,
-      data: blogs,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
+    const blogs = await Blog.find().sort({
+      createdAt: -1,
     });
+
+    res.json(blogs);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-// @desc    Get blog by slug
-// @route   GET /api/blogs/slug/:slug
-// @access  Public
 exports.getBlogBySlug = async (req, res) => {
   try {
-    const blog = await Blog.findOne({ slug: req.params.slug, status: 'published' });
-    
-    if (!blog) {
-      return res.status(404).json({ message: 'Blog not found' });
-    }
-    
-    // Increment views
-    blog.views += 1;
-    await blog.save();
-    
-    res.json({
-      success: true,
-      data: blog
+    const blog = await Blog.findOne({
+      slug: req.params.slug,
     });
+
+    if (!blog) {
+      return res.status(404).json({
+        message: "Blog not found",
+      });
+    }
+
+    res.json(blog);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-// @desc    Get blog by ID
-// @route   GET /api/blogs/:id
-// @access  Public
-exports.getBlogById = async (req, res) => {
-  try {
-    const blog = await Blog.findById(req.params.id);
-    
-    if (!blog) {
-      return res.status(404).json({ message: 'Blog not found' });
-    }
-    
-    res.json({
-      success: true,
-      data: blog
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-// @desc    Create a blog
-// @route   POST /api/blogs
-// @access  Private
 exports.createBlog = async (req, res) => {
   try {
-    const { title, content, excerpt, author, readingTime, metaTitle, metaDescription, tags, status } = req.body;
-    
-    // Handle featured image
-    let featuredImage = '';
-    if (req.file) {
-      featuredImage = `/uploads/blogs/${req.file.filename}`;
-    } else {
-      return res.status(400).json({ message: 'Featured image is required' });
-    }
-    
-    // Calculate reading time if not provided
-    let calculatedReadingTime = readingTime;
-    if (!calculatedReadingTime && content) {
-      const wordsPerMinute = 200;
-      const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
-      calculatedReadingTime = Math.max(1, Math.ceil(wordCount / wordsPerMinute));
-    }
-    
-    const blog = await Blog.create({
+    const {
       title,
-      content,
       excerpt,
-      featuredImage,
-      author: author || 'Admin',
-      readingTime: calculatedReadingTime || 5,
-      metaTitle: metaTitle || title,
-      metaDescription: metaDescription || excerpt,
-      tags: tags ? JSON.parse(tags) : [],
-      status: status || 'published'
+      content,
+      author,
+      metaTitle,
+      metaDescription,
+    } = req.body;
+
+    const slug = slugify(title, {
+      lower: true,
+      strict: true,
     });
-    
-    res.status(201).json({
-      success: true,
-      data: blog
+
+    const existing = await Blog.findOne({ slug });
+
+    if (existing) {
+      return res.status(400).json({
+        message: "Blog title already exists",
+      });
+    }
+
+    const blog = new Blog({
+      title,
+      slug,
+      excerpt,
+      content,
+      author,
+      metaTitle,
+      metaDescription,
+      readTime: calculateReadingTime(content),
+      coverImage: req.file
+        ? `/uploads/blogs/${req.file.filename}`
+        : "",
     });
+
+    await blog.save();
+
+    res.status(201).json(blog);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-// @desc    Update a blog
-// @route   PUT /api/blogs/:id
-// @access  Private
 exports.updateBlog = async (req, res) => {
   try {
+    const {
+      title,
+      excerpt,
+      content,
+      author,
+      metaTitle,
+      metaDescription,
+    } = req.body;
+
     const blog = await Blog.findById(req.params.id);
-    
+
     if (!blog) {
-      return res.status(404).json({ message: 'Blog not found' });
+      return res.status(404).json({
+        message: "Blog not found",
+      });
     }
-    
-    const { title, content, excerpt, author, readingTime, metaTitle, metaDescription, tags, status } = req.body;
-    
-    // Handle featured image update
-    let featuredImage = blog.featuredImage;
-    if (req.file) {
-      // Delete old image if exists
-      if (blog.featuredImage) {
-        const oldImagePath = path.join(__dirname, '..', blog.featuredImage);
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
-        }
-      }
-      featuredImage = `/uploads/blogs/${req.file.filename}`;
-    }
-    
-    // Calculate reading time if not provided
-    let calculatedReadingTime = readingTime;
-    if (!calculatedReadingTime && content) {
-      const wordsPerMinute = 200;
-      const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
-      calculatedReadingTime = Math.max(1, Math.ceil(wordCount / wordsPerMinute));
-    }
-    
-    const updatedBlog = await Blog.findByIdAndUpdate(
-      req.params.id,
-      {
-        title,
-        content,
-        excerpt,
-        featuredImage,
-        author,
-        readingTime: calculatedReadingTime,
-        metaTitle,
-        metaDescription,
-        tags: tags ? JSON.parse(tags) : [],
-        status
-      },
-      { new: true, runValidators: true }
-    );
-    
-    res.json({
-      success: true,
-      data: updatedBlog
+
+    blog.title = title;
+    blog.slug = slugify(title, {
+      lower: true,
+      strict: true,
     });
+
+    blog.excerpt = excerpt;
+    blog.content = content;
+    blog.author = author;
+    blog.metaTitle = metaTitle;
+    blog.metaDescription = metaDescription;
+    blog.readTime = calculateReadingTime(content);
+
+    if (req.file) {
+      blog.coverImage = `/uploads/blogs/${req.file.filename}`;
+    }
+
+    await blog.save();
+
+    res.json(blog);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-// @desc    Delete a blog
-// @route   DELETE /api/blogs/:id
-// @access  Private
 exports.deleteBlog = async (req, res) => {
   try {
-    const blog = await Blog.findById(req.params.id);
-    
+    const blog = await Blog.findByIdAndDelete(
+      req.params.id
+    );
+
     if (!blog) {
-      return res.status(404).json({ message: 'Blog not found' });
+      return res.status(404).json({
+        message: "Blog not found",
+      });
     }
-    
-    // Delete featured image
-    if (blog.featuredImage) {
-      const imagePath = path.join(__dirname, '..', blog.featuredImage);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
-    
-    await blog.deleteOne();
-    
+
     res.json({
-      success: true,
-      message: 'Blog deleted successfully'
+      message: "Blog deleted successfully",
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
