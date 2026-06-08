@@ -1,6 +1,7 @@
+// backend/controllers/blogController.js
 const Blog = require("../models/Blog");
 const slugify = require("slugify");
-const { cloudinary } = require("../config/cloudinary");
+const cloudinary = require("../config/cloudinary"); // direct instance, not destructured
 
 const calculateReadingTime = (text) => {
   const words = text.replace(/<[^>]+>/g, "").split(/\s+/).length;
@@ -11,15 +12,15 @@ const calculateReadingTime = (text) => {
 // Get all blogs with filtering, pagination, and search
 exports.getBlogs = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      search, 
-      category, 
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      category,
       tag,
       featured,
-      sortBy = 'createdAt',
-      order = 'desc'
+      sortBy = "createdAt",
+      order = "desc",
     } = req.query;
 
     let query = { published: true };
@@ -28,7 +29,7 @@ exports.getBlogs = async (req, res) => {
       query.$text = { $search: search };
     }
 
-    if (category && category !== 'all') {
+    if (category && category !== "all") {
       query.category = category;
     }
 
@@ -36,12 +37,12 @@ exports.getBlogs = async (req, res) => {
       query.tags = tag;
     }
 
-    if (featured === 'true') {
+    if (featured === "true") {
       query.featured = true;
     }
 
     const sortOptions = {};
-    sortOptions[sortBy] = order === 'desc' ? -1 : 1;
+    sortOptions[sortBy] = order === "desc" ? -1 : 1;
 
     const blogs = await Blog.find(query)
       .sort(sortOptions)
@@ -101,13 +102,10 @@ exports.getBlogBySlug = async (req, res) => {
     const relatedBlogs = await Blog.find({
       _id: { $ne: blog._id },
       published: true,
-      $or: [
-        { category: blog.category },
-        { tags: { $in: blog.tags } }
-      ]
+      $or: [{ category: blog.category }, { tags: { $in: blog.tags } }],
     })
-    .limit(3)
-    .select('title slug coverImage excerpt readTime');
+      .limit(3)
+      .select("title slug coverImage excerpt readTime");
 
     res.json({ blog, relatedBlogs });
   } catch (error) {
@@ -128,48 +126,48 @@ exports.createBlog = async (req, res) => {
       metaTitle,
       metaDescription,
       featured,
-      published
+      published,
     } = req.body;
 
-    // Generate slug from title
     const slug = slugify(title, { lower: true, strict: true });
-    
-    // Check if slug already exists
+
     const existing = await Blog.findOne({ slug });
     if (existing) {
-      return res.status(400).json({ message: "Blog title already exists" });
+      return res
+        .status(400)
+        .json({ message: "Blog title already exists" });
     }
 
-    // Parse tags if sent as string
     let parsedTags = [];
     if (tags) {
-      parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+      parsedTags = typeof tags === "string" ? JSON.parse(tags) : tags;
     }
 
-    // Prepare blog data
     const blogData = {
       title,
       slug,
-      excerpt: excerpt || content.substring(0, 160).replace(/<[^>]+>/g, ''),
+      excerpt:
+        excerpt ||
+        content.substring(0, 160).replace(/<[^>]+>/g, ""),
       content,
-      author: author || "Admin",
+      author,
       tags: parsedTags,
-      category: category || 'General',
-      metaTitle: metaTitle || title,
-      metaDescription: metaDescription || excerpt || content.substring(0, 160).replace(/<[^>]+>/g, ''),
+      category: category || "General",
+      metaTitle,
+      metaDescription,
       readTime: calculateReadingTime(content),
-      featured: featured === 'true' || featured === true,
-      published: published === 'true' || published === true,
+      featured: featured === "true" || featured === true,
+      published: published === "true" || published === true,
     };
 
-    // Handle image upload to Cloudinary
+    // req.file is populated by multer-storage-cloudinary
+    // req.file.path  => the secure Cloudinary URL
+    // req.file.filename => the public_id in Cloudinary
     if (req.file) {
-      console.log('File uploaded:', req.file);
       blogData.coverImage = {
-        url: req.file.path, // Cloudinary URL
-        publicId: req.file.filename, // Cloudinary public ID
+        url: req.file.path,       // Cloudinary secure URL
+        publicId: req.file.filename, // Cloudinary public_id
       };
-      console.log('Image saved with URL:', blogData.coverImage.url);
     }
 
     const blog = new Blog(blogData);
@@ -177,7 +175,6 @@ exports.createBlog = async (req, res) => {
 
     res.status(201).json(blog);
   } catch (error) {
-    console.error('Error creating blog:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -198,61 +195,52 @@ exports.updateBlog = async (req, res) => {
       published,
     } = req.body;
 
-    // Find existing blog
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
       return res.status(404).json({ message: "Blog not found" });
     }
 
-    // Delete old image from Cloudinary if new image is uploaded
+    // Delete old Cloudinary image only when a new one is being uploaded
     if (req.file && blog.coverImage?.publicId) {
       try {
         await cloudinary.uploader.destroy(blog.coverImage.publicId);
-        console.log('Old image deleted from Cloudinary:', blog.coverImage.publicId);
-      } catch (error) {
-        console.error('Error deleting old image from Cloudinary:', error);
+      } catch (err) {
+        console.warn("Could not delete old Cloudinary image:", err.message);
       }
     }
 
-    // Parse tags
     let parsedTags = blog.tags;
     if (tags) {
-      parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+      parsedTags = typeof tags === "string" ? JSON.parse(tags) : tags;
     }
 
-    // Update blog fields
     blog.title = title;
     blog.slug = slugify(title, { lower: true, strict: true });
-    blog.excerpt = excerpt || content.substring(0, 160).replace(/<[^>]+>/g, '');
+    blog.excerpt =
+      excerpt || content.substring(0, 160).replace(/<[^>]+>/g, "");
     blog.content = content;
-    blog.author = author || "Admin";
+    blog.author = author;
     blog.tags = parsedTags;
-    blog.category = category || 'General';
-    blog.metaTitle = metaTitle || title;
-    blog.metaDescription = metaDescription || excerpt || content.substring(0, 160).replace(/<[^>]+>/g, '');
+    blog.category = category;
+    blog.metaTitle = metaTitle;
+    blog.metaDescription = metaDescription;
     blog.readTime = calculateReadingTime(content);
-    blog.featured = featured === 'true' || featured === true;
-    
+    blog.featured = featured === "true" || featured === true;
+
     if (published !== undefined) {
-      blog.published = published === 'true' || published === true;
+      blog.published = published === "true" || published === true;
     }
 
-    // Handle new image upload
     if (req.file) {
       blog.coverImage = {
-        url: req.file.path,
-        publicId: req.file.filename,
+        url: req.file.path,          // Cloudinary secure URL
+        publicId: req.file.filename, // Cloudinary public_id
       };
-      console.log('New image uploaded to Cloudinary:', {
-        url: req.file.path,
-        publicId: req.file.filename
-      });
     }
 
     await blog.save();
     res.json(blog);
   } catch (error) {
-    console.error('Error updating blog:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -265,20 +253,17 @@ exports.deleteBlog = async (req, res) => {
       return res.status(404).json({ message: "Blog not found" });
     }
 
-    // Delete image from Cloudinary if exists
     if (blog.coverImage?.publicId) {
       try {
         await cloudinary.uploader.destroy(blog.coverImage.publicId);
-        console.log('Image deleted from Cloudinary:', blog.coverImage.publicId);
-      } catch (error) {
-        console.error('Error deleting image from Cloudinary:', error);
+      } catch (err) {
+        console.warn("Could not delete Cloudinary image:", err.message);
       }
     }
 
     await blog.deleteOne();
     res.json({ message: "Blog deleted successfully" });
   } catch (error) {
-    console.error('Error deleting blog:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -289,10 +274,10 @@ exports.getBlogStats = async (req, res) => {
     const totalBlogs = await Blog.countDocuments();
     const publishedBlogs = await Blog.countDocuments({ published: true });
     const totalViews = await Blog.aggregate([
-      { $group: { _id: null, total: { $sum: "$views" } } }
+      { $group: { _id: null, total: { $sum: "$views" } } },
     ]);
     const categories = await Blog.aggregate([
-      { $group: { _id: "$category", count: { $sum: 1 } } }
+      { $group: { _id: "$category", count: { $sum: 1 } } },
     ]);
 
     res.json({
