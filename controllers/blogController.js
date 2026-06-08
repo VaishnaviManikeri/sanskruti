@@ -131,38 +131,45 @@ exports.createBlog = async (req, res) => {
       published
     } = req.body;
 
+    // Generate slug from title
     const slug = slugify(title, { lower: true, strict: true });
     
+    // Check if slug already exists
     const existing = await Blog.findOne({ slug });
     if (existing) {
       return res.status(400).json({ message: "Blog title already exists" });
     }
 
+    // Parse tags if sent as string
     let parsedTags = [];
     if (tags) {
       parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
     }
 
+    // Prepare blog data
     const blogData = {
       title,
       slug,
       excerpt: excerpt || content.substring(0, 160).replace(/<[^>]+>/g, ''),
       content,
-      author,
+      author: author || "Admin",
       tags: parsedTags,
       category: category || 'General',
-      metaTitle,
-      metaDescription,
+      metaTitle: metaTitle || title,
+      metaDescription: metaDescription || excerpt || content.substring(0, 160).replace(/<[^>]+>/g, ''),
       readTime: calculateReadingTime(content),
       featured: featured === 'true' || featured === true,
       published: published === 'true' || published === true,
     };
 
+    // Handle image upload to Cloudinary
     if (req.file) {
+      console.log('File uploaded:', req.file);
       blogData.coverImage = {
-        url: req.file.path,
-        publicId: req.file.filename,
+        url: req.file.path, // Cloudinary URL
+        publicId: req.file.filename, // Cloudinary public ID
       };
+      console.log('Image saved with URL:', blogData.coverImage.url);
     }
 
     const blog = new Blog(blogData);
@@ -170,6 +177,7 @@ exports.createBlog = async (req, res) => {
 
     res.status(201).json(blog);
   } catch (error) {
+    console.error('Error creating blog:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -190,29 +198,38 @@ exports.updateBlog = async (req, res) => {
       published,
     } = req.body;
 
+    // Find existing blog
     const blog = await Blog.findById(req.params.id);
     if (!blog) {
       return res.status(404).json({ message: "Blog not found" });
     }
 
+    // Delete old image from Cloudinary if new image is uploaded
     if (req.file && blog.coverImage?.publicId) {
-      await cloudinary.uploader.destroy(blog.coverImage.publicId);
+      try {
+        await cloudinary.uploader.destroy(blog.coverImage.publicId);
+        console.log('Old image deleted from Cloudinary:', blog.coverImage.publicId);
+      } catch (error) {
+        console.error('Error deleting old image from Cloudinary:', error);
+      }
     }
 
+    // Parse tags
     let parsedTags = blog.tags;
     if (tags) {
       parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
     }
 
+    // Update blog fields
     blog.title = title;
     blog.slug = slugify(title, { lower: true, strict: true });
     blog.excerpt = excerpt || content.substring(0, 160).replace(/<[^>]+>/g, '');
     blog.content = content;
-    blog.author = author;
+    blog.author = author || "Admin";
     blog.tags = parsedTags;
-    blog.category = category;
-    blog.metaTitle = metaTitle;
-    blog.metaDescription = metaDescription;
+    blog.category = category || 'General';
+    blog.metaTitle = metaTitle || title;
+    blog.metaDescription = metaDescription || excerpt || content.substring(0, 160).replace(/<[^>]+>/g, '');
     blog.readTime = calculateReadingTime(content);
     blog.featured = featured === 'true' || featured === true;
     
@@ -220,16 +237,22 @@ exports.updateBlog = async (req, res) => {
       blog.published = published === 'true' || published === true;
     }
 
+    // Handle new image upload
     if (req.file) {
       blog.coverImage = {
         url: req.file.path,
         publicId: req.file.filename,
       };
+      console.log('New image uploaded to Cloudinary:', {
+        url: req.file.path,
+        publicId: req.file.filename
+      });
     }
 
     await blog.save();
     res.json(blog);
   } catch (error) {
+    console.error('Error updating blog:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -242,13 +265,20 @@ exports.deleteBlog = async (req, res) => {
       return res.status(404).json({ message: "Blog not found" });
     }
 
+    // Delete image from Cloudinary if exists
     if (blog.coverImage?.publicId) {
-      await cloudinary.uploader.destroy(blog.coverImage.publicId);
+      try {
+        await cloudinary.uploader.destroy(blog.coverImage.publicId);
+        console.log('Image deleted from Cloudinary:', blog.coverImage.publicId);
+      } catch (error) {
+        console.error('Error deleting image from Cloudinary:', error);
+      }
     }
 
     await blog.deleteOne();
     res.json({ message: "Blog deleted successfully" });
   } catch (error) {
+    console.error('Error deleting blog:', error);
     res.status(500).json({ message: error.message });
   }
 };
