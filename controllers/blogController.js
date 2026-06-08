@@ -1,11 +1,21 @@
 const Blog = require("../models/Blog");
 const slugify = require("slugify");
-const { cloudinary } = require("../config/cloudinary");
+const cloudinary = require("../config/cloudinary");
 
 const calculateReadingTime = (text) => {
   const words = text.replace(/<[^>]+>/g, "").split(/\s+/).length;
   const minutes = Math.ceil(words / 200);
   return `${minutes} min read`;
+};
+
+// Get all blogs for admin (including unpublished)
+exports.getAllBlogsAdmin = async (req, res) => {
+  try {
+    const blogs = await Blog.find().sort({ createdAt: -1 });
+    res.json(blogs);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // Get all blogs with filtering, pagination, and search
@@ -101,6 +111,9 @@ exports.getBlogBySlug = async (req, res) => {
 // Create new blog
 exports.createBlog = async (req, res) => {
   try {
+    console.log('Creating blog - Body:', req.body);
+    console.log('Creating blog - File:', req.file);
+
     const {
       title,
       excerpt,
@@ -111,6 +124,7 @@ exports.createBlog = async (req, res) => {
       metaTitle,
       metaDescription,
       featured,
+      published,
     } = req.body;
 
     // Generate slug
@@ -125,7 +139,7 @@ exports.createBlog = async (req, res) => {
     // Parse tags if sent as string
     let parsedTags = [];
     if (tags) {
-      parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+      parsedTags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : tags;
     }
 
     const blogData = {
@@ -133,13 +147,14 @@ exports.createBlog = async (req, res) => {
       slug,
       excerpt: excerpt || content.substring(0, 160).replace(/<[^>]+>/g, ''),
       content,
-      author,
+      author: author || 'Admin',
       tags: parsedTags,
       category: category || 'General',
-      metaTitle,
-      metaDescription,
+      metaTitle: metaTitle || title,
+      metaDescription: metaDescription || excerpt || content.substring(0, 160).replace(/<[^>]+>/g, ''),
       readTime: calculateReadingTime(content),
       featured: featured === 'true' || featured === true,
+      published: published === 'true' || published === true,
     };
 
     // Handle image upload to Cloudinary
@@ -155,6 +170,7 @@ exports.createBlog = async (req, res) => {
 
     res.status(201).json(blog);
   } catch (error) {
+    console.error('Error creating blog:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -162,6 +178,10 @@ exports.createBlog = async (req, res) => {
 // Update blog
 exports.updateBlog = async (req, res) => {
   try {
+    console.log('Updating blog - ID:', req.params.id);
+    console.log('Updating blog - Body:', req.body);
+    console.log('Updating blog - File:', req.file);
+
     const {
       title,
       excerpt,
@@ -182,24 +202,28 @@ exports.updateBlog = async (req, res) => {
 
     // Delete old image from Cloudinary if new image is uploaded
     if (req.file && blog.coverImage?.publicId) {
-      await cloudinary.uploader.destroy(blog.coverImage.publicId);
+      try {
+        await cloudinary.uploader.destroy(blog.coverImage.publicId);
+      } catch (err) {
+        console.error('Error deleting old image:', err);
+      }
     }
 
     // Parse tags
     let parsedTags = blog.tags;
     if (tags) {
-      parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
+      parsedTags = typeof tags === 'string' ? tags.split(',').map(t => t.trim()) : tags;
     }
 
     blog.title = title;
     blog.slug = slugify(title, { lower: true, strict: true });
     blog.excerpt = excerpt || content.substring(0, 160).replace(/<[^>]+>/g, '');
     blog.content = content;
-    blog.author = author;
+    blog.author = author || blog.author;
     blog.tags = parsedTags;
-    blog.category = category;
-    blog.metaTitle = metaTitle;
-    blog.metaDescription = metaDescription;
+    blog.category = category || blog.category;
+    blog.metaTitle = metaTitle || title;
+    blog.metaDescription = metaDescription || excerpt || content.substring(0, 160).replace(/<[^>]+>/g, '');
     blog.readTime = calculateReadingTime(content);
     blog.featured = featured === 'true' || featured === true;
     
@@ -217,6 +241,7 @@ exports.updateBlog = async (req, res) => {
     await blog.save();
     res.json(blog);
   } catch (error) {
+    console.error('Error updating blog:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -231,7 +256,11 @@ exports.deleteBlog = async (req, res) => {
 
     // Delete image from Cloudinary
     if (blog.coverImage?.publicId) {
-      await cloudinary.uploader.destroy(blog.coverImage.publicId);
+      try {
+        await cloudinary.uploader.destroy(blog.coverImage.publicId);
+      } catch (err) {
+        console.error('Error deleting image from Cloudinary:', err);
+      }
     }
 
     await blog.deleteOne();
