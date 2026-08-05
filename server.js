@@ -1,4 +1,4 @@
-// backend/server.js (add video routes)
+// backend/server.js
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -120,7 +120,7 @@ app.use("/api/careers", require("./routes/careers"));
 // BLOG ROUTES
 app.use("/api/blogs", require("./routes/blogs"));
 
-// VIDEO ROUTES (NEW)
+// VIDEO ROUTES (Make sure this line exists)
 app.use("/api/videos", require("./routes/videos"));
 
 /* =========================================================
