@@ -1,186 +1,122 @@
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 // Ensure upload directories exist
-const ensureDirectoryExists = (dirPath) => {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
+const createUploadDirs = () => {
+  const dirs = [
+    path.join(__dirname, '../uploads/videos'),
+    path.join(__dirname, '../uploads/thumbnails')
+  ];
+  
+  dirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
 };
+
+createUploadDirs();
 
 // Configure storage for video files
 const videoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../uploads/videos");
-    ensureDirectoryExists(uploadDir);
-    cb(null, uploadDir);
+    cb(null, path.join(__dirname, '../uploads/videos'));
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
     cb(null, `video-${uniqueSuffix}${ext}`);
-  },
+  }
 });
 
 // Configure storage for thumbnail files
 const thumbnailStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, "../uploads/thumbnails");
-    ensureDirectoryExists(uploadDir);
-    cb(null, uploadDir);
+    cb(null, path.join(__dirname, '../uploads/thumbnails'));
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
     cb(null, `thumbnail-${uniqueSuffix}${ext}`);
-  },
+  }
 });
 
 // File filter for videos
 const videoFileFilter = (req, file, cb) => {
-  const allowedVideoTypes = [
-    "video/mp4",
-    "video/mpeg",
-    "video/quicktime",
-    "video/x-msvideo",
-    "video/x-matroska",
-    "video/webm",
-    "video/ogg",
-    "video/3gpp",
-    "video/3gpp2",
-  ];
-
-  if (allowedVideoTypes.includes(file.mimetype)) {
+  const allowedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'];
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(
-      new Error(
-        "Invalid file type. Only video files are allowed: MP4, MPEG, MOV, AVI, MKV, WebM, OGG, 3GP"
-      ),
-      false
-    );
+    cb(new Error('Invalid video format. Please upload MP4, WebM, OGG, MOV, AVI, or MKV files.'), false);
   }
 };
 
-// File filter for thumbnails
-const thumbnailFileFilter = (req, file, cb) => {
-  const allowedImageTypes = [
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-  ];
-
-  if (allowedImageTypes.includes(file.mimetype)) {
+// File filter for images (thumbnails)
+const imageFileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(
-      new Error(
-        "Invalid file type. Only image files are allowed: JPEG, JPG, PNG, WebP, GIF"
-      ),
-      false
-    );
+    cb(new Error('Invalid image format. Please upload JPEG, PNG, GIF, or WebP files.'), false);
   }
 };
 
-// Create multer instances
+// Multer instances
 const uploadVideo = multer({
   storage: videoStorage,
   limits: {
-    fileSize: 500 * 1024 * 1024, // 500MB limit
+    fileSize: 100 * 1024 * 1024 // 100MB limit
   },
-  fileFilter: videoFileFilter,
+  fileFilter: videoFileFilter
 });
 
 const uploadThumbnail = multer({
   storage: thumbnailStorage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 5 * 1024 * 1024 // 5MB limit
   },
-  fileFilter: thumbnailFileFilter,
+  fileFilter: imageFileFilter
 });
 
-// Middleware for video upload with thumbnail
-const videoUploadMiddleware = (req, res, next) => {
-  // Use multer to handle multiple files
+// Combined upload middleware for both video and thumbnail
+const uploadVideoWithThumbnail = (req, res, next) => {
   const upload = multer({
     storage: multer.diskStorage({
       destination: (req, file, cb) => {
-        let uploadDir;
-        if (file.fieldname === "videoFile") {
-          uploadDir = path.join(__dirname, "../uploads/videos");
-        } else if (file.fieldname === "thumbnailFile") {
-          uploadDir = path.join(__dirname, "../uploads/thumbnails");
-        } else {
-          uploadDir = path.join(__dirname, "../uploads");
+        if (file.fieldname === 'video') {
+          cb(null, path.join(__dirname, '../uploads/videos'));
+        } else if (file.fieldname === 'thumbnail') {
+          cb(null, path.join(__dirname, '../uploads/thumbnails'));
         }
-        ensureDirectoryExists(uploadDir);
-        cb(null, uploadDir);
       },
       filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname);
-        let prefix = "file";
-        if (file.fieldname === "videoFile") {
-          prefix = "video";
-        } else if (file.fieldname === "thumbnailFile") {
-          prefix = "thumbnail";
-        }
+        const prefix = file.fieldname === 'video' ? 'video' : 'thumbnail';
         cb(null, `${prefix}-${uniqueSuffix}${ext}`);
-      },
+      }
     }),
     limits: {
-      fileSize: 500 * 1024 * 1024, // 500MB
+      fileSize: file.fieldname === 'video' ? 100 * 1024 * 1024 : 5 * 1024 * 1024
     },
     fileFilter: (req, file, cb) => {
-      if (file.fieldname === "videoFile") {
-        const allowedTypes = [
-          "video/mp4",
-          "video/mpeg",
-          "video/quicktime",
-          "video/x-msvideo",
-          "video/x-matroska",
-          "video/webm",
-          "video/ogg",
-          "video/3gpp",
-          "video/3gpp2",
-        ];
-        if (allowedTypes.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(new Error("Invalid video file type"), false);
-        }
-      } else if (file.fieldname === "thumbnailFile") {
-        const allowedTypes = [
-          "image/jpeg",
-          "image/jpg",
-          "image/png",
-          "image/webp",
-          "image/gif",
-        ];
-        if (allowedTypes.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(new Error("Invalid image file type for thumbnail"), false);
-        }
+      if (file.fieldname === 'video') {
+        videoFileFilter(req, file, cb);
+      } else if (file.fieldname === 'thumbnail') {
+        imageFileFilter(req, file, cb);
       } else {
-        cb(null, true);
+        cb(new Error('Unexpected field'), false);
       }
-    },
+    }
   }).fields([
-    { name: "videoFile", maxCount: 1 },
-    { name: "thumbnailFile", maxCount: 1 },
+    { name: 'video', maxCount: 1 },
+    { name: 'thumbnail', maxCount: 1 }
   ]);
 
   upload(req, res, (err) => {
     if (err) {
-      console.error("Upload error:", err);
-      return res.status(400).json({
-        message: "File upload error",
-        error: err.message,
-      });
+      return res.status(400).json({ error: err.message });
     }
     next();
   });
@@ -189,5 +125,5 @@ const videoUploadMiddleware = (req, res, next) => {
 module.exports = {
   uploadVideo,
   uploadThumbnail,
-  videoUploadMiddleware,
+  uploadVideoWithThumbnail
 };
