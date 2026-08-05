@@ -36,6 +36,22 @@ const extractVideoId = (url) => {
   return null;
 };
 
+// Helper function to fetch Vimeo thumbnail
+const fetchVimeoThumbnail = async (videoId) => {
+  try {
+    const response = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data[0] && data[0].thumbnail_large) {
+        return data[0].thumbnail_large;
+      }
+    }
+    return '/default-thumbnail.jpg';
+  } catch (error) {
+    return '/default-thumbnail.jpg';
+  }
+};
+
 // @desc    Get all videos
 // @route   GET /api/videos
 // @access  Public
@@ -113,7 +129,7 @@ const createVideo = async (req, res) => {
     };
 
     // Handle uploaded video file
-    if (req.files?.video) {
+    if (req.files && req.files.video) {
       const videoFile = req.files.video[0];
       videoData.videoFile = `/uploads/videos/${videoFile.filename}`;
       videoData.videoUrl = videoData.videoFile;
@@ -128,7 +144,7 @@ const createVideo = async (req, res) => {
     }
 
     // Handle thumbnail
-    if (req.files?.thumbnail) {
+    if (req.files && req.files.thumbnail) {
       const thumbnailFile = req.files.thumbnail[0];
       videoData.thumbnail = `/uploads/thumbnails/${thumbnailFile.filename}`;
     } else if (videoUrl) {
@@ -163,22 +179,6 @@ const createVideo = async (req, res) => {
   }
 };
 
-// Helper function to fetch Vimeo thumbnail
-const fetchVimeoThumbnail = async (videoId) => {
-  try {
-    const response = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`);
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data[0] && data[0].thumbnail_large) {
-        return data[0].thumbnail_large;
-      }
-    }
-    return '/default-thumbnail.jpg';
-  } catch (error) {
-    return '/default-thumbnail.jpg';
-  }
-};
-
 // @desc    Update video
 // @route   PUT /api/videos/:id
 // @access  Private
@@ -198,7 +198,7 @@ const updateVideo = async (req, res) => {
     if (isActive !== undefined) video.isActive = isActive;
 
     // Handle video file update
-    if (req.files?.video) {
+    if (req.files && req.files.video) {
       // Delete old video file if exists
       if (video.videoFile) {
         const oldPath = path.join(__dirname, '..', video.videoFile);
@@ -220,8 +220,8 @@ const updateVideo = async (req, res) => {
     }
 
     // Handle thumbnail update
-    if (req.files?.thumbnail) {
-      // Delete old thumbnail if exists
+    if (req.files && req.files.thumbnail) {
+      // Delete old thumbnail if exists and not default
       if (video.thumbnail && !video.thumbnail.includes('default-thumbnail') && 
           !video.thumbnail.includes('img.youtube.com')) {
         const oldPath = path.join(__dirname, '..', video.thumbnail);
