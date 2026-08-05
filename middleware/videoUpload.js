@@ -62,7 +62,7 @@ const imageFileFilter = (req, file, cb) => {
   }
 };
 
-// Multer instances
+// Multer instances with larger limits
 const uploadVideo = multer({
   storage: videoStorage,
   limits: {
@@ -88,6 +88,8 @@ const uploadVideoWithThumbnail = (req, res, next) => {
           cb(null, path.join(__dirname, '../uploads/videos'));
         } else if (file.fieldname === 'thumbnail') {
           cb(null, path.join(__dirname, '../uploads/thumbnails'));
+        } else {
+          cb(new Error('Unexpected field'), false);
         }
       },
       filename: (req, file, cb) => {
@@ -98,7 +100,7 @@ const uploadVideoWithThumbnail = (req, res, next) => {
       }
     }),
     limits: {
-      fileSize: file.fieldname === 'video' ? 100 * 1024 * 1024 : 5 * 1024 * 1024
+      fileSize: 100 * 1024 * 1024 // 100MB limit for all files
     },
     fileFilter: (req, file, cb) => {
       if (file.fieldname === 'video') {
@@ -116,6 +118,18 @@ const uploadVideoWithThumbnail = (req, res, next) => {
 
   upload(req, res, (err) => {
     if (err) {
+      console.error('Multer error:', err);
+      // Handle specific multer errors
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ 
+          error: `File size too large. Maximum size is 100MB.` 
+        });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ 
+          error: 'Unexpected field. Please use "video" and "thumbnail" fields.' 
+        });
+      }
       return res.status(400).json({ error: err.message });
     }
     next();
