@@ -19,7 +19,7 @@ const getVideoId = (url) => {
   return null;
 };
 
-// Get all videos
+// Get all videos (admin)
 exports.getVideos = async (req, res) => {
   try {
     const videos = await Video.find()
@@ -33,6 +33,28 @@ exports.getVideos = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching videos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching videos',
+      error: error.message,
+    });
+  }
+};
+
+// Get public videos (active only)
+exports.getPublicVideos = async (req, res) => {
+  try {
+    const videos = await Video.find({ isActive: true })
+      .sort({ createdAt: -1 })
+      .select('-__v');
+    
+    res.status(200).json({
+      success: true,
+      count: videos.length,
+      videos,
+    });
+  } catch (error) {
+    console.error('Error fetching public videos:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching videos',
@@ -300,28 +322,6 @@ exports.deleteVideo = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting video',
-      error: error.message,
-    });
-  }
-};
-
-// Get public videos (active only)
-exports.getPublicVideos = async (req, res) => {
-  try {
-    const videos = await Video.find({ isActive: true })
-      .sort({ createdAt: -1 })
-      .select('-__v');
-    
-    res.status(200).json({
-      success: true,
-      count: videos.length,
-      videos,
-    });
-  } catch (error) {
-    console.error('Error fetching public videos:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching videos',
       error: error.message,
     });
   }
