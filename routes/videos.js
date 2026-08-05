@@ -1,43 +1,24 @@
-// backend/routes/videos.js
 const express = require('express');
 const router = express.Router();
-const videoController = require('../controllers/videoController');
-const upload = require('../middleware/videoUpload');
-const auth = require('../middleware/auth');
+const {
+  getVideos,
+  getAdminVideos,
+  getVideoById,
+  createVideo,
+  updateVideo,
+  deleteVideo
+} = require('../controllers/videoController');
+const authMiddleware = require('../middleware/auth');
+const { uploadVideoWithThumbnail } = require('../middleware/videoUpload');
 
 // Public routes
-router.get('/public', videoController.getPublicVideos);
+router.get('/', getVideos);
+router.get('/:id', getVideoById);
 
-// Protected routes (admin only)
-router.get('/', auth, videoController.getVideos);
-router.get('/:id', auth, videoController.getVideo);
-
-// Create video with file upload
-router.post(
-  '/',
-  auth,
-  upload.fields([
-    { name: 'video', maxCount: 1 },
-    { name: 'thumbnail', maxCount: 1 },
-  ]),
-  videoController.createVideo
-);
-
-// Update video
-router.put(
-  '/:id',
-  auth,
-  upload.fields([
-    { name: 'video', maxCount: 1 },
-    { name: 'thumbnail', maxCount: 1 },
-  ]),
-  videoController.updateVideo
-);
-
-// Delete video
-router.delete('/:id', auth, videoController.deleteVideo);
-
-// Update views (public)
-router.post('/:id/views', videoController.updateViews);
+// Admin routes
+router.get('/admin/all', authMiddleware, getAdminVideos);
+router.post('/', authMiddleware, uploadVideoWithThumbnail, createVideo);
+router.put('/:id', authMiddleware, uploadVideoWithThumbnail, updateVideo);
+router.delete('/:id', authMiddleware, deleteVideo);
 
 module.exports = router;
